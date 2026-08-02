@@ -146,8 +146,17 @@ in real time.
 
 ## 6. See it working
 
-- 📈 **Dashboard:** the [hosted Streamlit demo](https://snorlax.streamlit.app/)
-  reads `concurrency_now`. (Point it at your own service, or run a local copy.)
+- 📈 **Dashboard:** run the Streamlit app locally — it reuses `producer/.env`
+  automatically, so no extra config:
+  ```bash
+  cd ../sonyliv-dashboard-py
+  python3 -m venv .venv && source .venv/bin/activate
+  pip install -r requirements.txt
+  streamlit run app.py          # http://localhost:8501
+  ```
+  Or just open the [hosted demo](https://snorlax.streamlit.app/). See
+  [`sonyliv-dashboard-py/README.md`](sonyliv-dashboard-py/README.md) for the four
+  panes, the Insights Copilot, and OTel/LibreChat wiring.
 - 🔎 **Direct query:** poke the serving layer yourself —
   ```bash
   cd migrations
@@ -203,13 +212,19 @@ sealed-dataset ("unseen day") replay so nothing leaks between runs.
 
 ## 🔌 Optional: the integration layers
 
-These are separate services, not required to run the core pipeline:
+These are separate services, not required to run the core pipeline — the
+dashboard runs fine without them:
 
-- 💬 **LibreChat + ClickHouse MCP** — conversational querying over `concurrency_now`
-  via the [ClickHouse MCP server](https://github.com/ClickHouse/mcp-clickhouse).
-- 🔭 **Langfuse** — LLM observability over the chat layer.
-- 🛰️ **ClickStack (HyperDX)** — pipeline + engine observability (and the target for
-  the Streamlit app's OpenTelemetry traces).
+- ✨ **Insights Copilot (LibreChat + Ollama + MCP)** — the in-app chat panel routes
+  through a local **LibreChat** (Docker), which runs the turn on a local **Ollama**
+  model and hands it **[ClickHouse MCP](https://github.com/ClickHouse/mcp-clickhouse)**
+  + ClickStack MCP tools. Full walkthrough in
+  [`sonyliv-dashboard-py/README.md`](sonyliv-dashboard-py/README.md#connect-to-librechat).
+  If unconfigured, the panel falls back to calling Ollama directly (or just shows a
+  connection message).
+- 🔭 **Langfuse** — LLM observability over the Copilot's turns (prompt / latency / cost).
+- 🛰️ **ClickStack (HyperDX)** — pipeline + engine observability, and the OTLP target
+  for the Streamlit app's OpenTelemetry traces (set `OTEL_EXPORTER_OTLP_ENDPOINT`).
 
 See the [Integrations section of the README](README.md#-integrations--four-planes-each-with-a-job)
 for what each plane does.

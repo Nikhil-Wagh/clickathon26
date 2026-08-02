@@ -18,7 +18,9 @@ One system, watched at **two altitudes** — the product plane the business read
 
 ### 🟢 Product plane — what the business sees
 
-🖥️ **[snorlax.streamlit.app](https://snorlax.streamlit.app/)** — the real-time concurrency curve, dimension filters, and KPI tiles, reading straight off `concurrency_now`. This is the *insight* layer: peak/average concurrency, top content, per-platform splits — the numbers a content or ad-ops team actually makes calls on.
+🖥️ **[snorlax.streamlit.app](https://snorlax.streamlit.app/)** — the real-time concurrency curve, dimension filters, and KPI tiles, reading straight off `concurrency_now`. This is the *insight* layer: peak/average concurrency, top content, per-platform splits — the numbers a content or ad-ops team actually makes calls on. Four panes — 📈 Concurrency, 🚨 Errors, 🧭 Insights, 🔬 Drill-down — plus an **✨ Insights Copilot** that answers questions in plain English (see [Integrations](#-integrations--four-planes-each-with-a-job)).
+
+The full source lives in [`sonyliv-dashboard-py/`](sonyliv-dashboard-py/) (Streamlit + `clickhouse-connect` + Plotly) — run it locally with `streamlit run app.py`, see that folder's [README](sonyliv-dashboard-py/README.md).
 
 <!-- 📸 Streamlit product-plane screenshots go here -->
 
@@ -58,7 +60,7 @@ One system, watched at **two altitudes** — the product plane the business read
 
 > The **serving-vs-raw latency** panel is the headline proof: the serving tables answer at **P95 ≈ 60 ms** reading ~370K rows, while the same questions over raw history sit at **P95 ≈ 187 ms** reading far more — exactly the "read the serving layer, not raw history" property the challenge is judged on.
 
-> 🔭 **Closing the loop:** the Streamlit product plane emits its own **OpenTelemetry** traces into the same ClickStack pipeline — so UI-side request latency lands right next to ingestion lag and engine query performance. One trace, front door to back end.
+> 🔭 **Closing the loop:** the Streamlit product plane is instrumented with **OpenTelemetry** ([`sonyliv-dashboard-py/otel_setup.py`](sonyliv-dashboard-py/otel_setup.py)) — spans + metrics export over OTLP into the same ClickStack pipeline, so UI-side request latency lands right next to ingestion lag and engine query performance. One trace, front door to back end. (Set `OTEL_EXPORTER_OTLP_ENDPOINT`; falls back to a safe no-op if OTel isn't installed.)
 >
 > 🔐 HyperDX dashboard links require ClickHouse Cloud access — the screenshots above are the shareable evidence.
 
@@ -109,32 +111,30 @@ A session isn't "active" just because it's open. `VideoSessionStart` seeds a ses
 The challenge asks for *meaningful* integration of **at least one** of ClickStack, Langfuse, or LibreChat. Snorlax ships **all three** — plus a product UI — and each sits at a different altitude with a distinct audience. No box-ticking; every layer earns its place.
 
 ```
-                        ┌────────────────────────────────────────────┐
-   ask in English  ───► │  💬 LibreChat + ClickHouse MCP              │
-                        │     conversational plane                    │
-                        └───────────────────┬────────────────────────┘
-                                             │ traced by
-                                             ▼
-                        ┌────────────────────────────────────────────┐
-                        │  🔭 Langfuse — LLM observability            │
-                        │     (question → SQL → answer, cost/latency) │
-                        └────────────────────────────────────────────┘
+  ask in English ─► ✨ Insights Copilot (in the Streamlit sidebar)
+                          │
+                          ▼
+                    💬 LibreChat  (local, Docker — the hub)
+                          │  runs each turn on ▼        ├─► 🧰 ClickHouse MCP  (queries the data)
+                    🦙 Ollama (llama3.2:3b, local)      └─► 🧰 ClickStack MCP  (queries the telemetry)
+                          │  traced by ▼
+                    🔭 Langfuse — LLM observability (prompt / latency / cost)
 
-   business insight ──► 🟢 Streamlit  ── product plane (KPIs, curves, filters)
-                              │ OTel traces ▼
-   engine & pipeline ─► 🔵 ClickStack (HyperDX) ── engine plane (health, latency, correctness)
+  business insight ─► 🟢 Streamlit ── product plane (KPIs, curves, filters, drill-down)
+                          │ OTel traces ▼
+  engine & pipeline ─► 🔵 ClickStack (HyperDX) ── engine plane (health, latency, correctness)
 
-                        ─────────  all reading  ─────────►  ⚡ ClickHouse
+                    ─────────  all reading  ─────────►  ⚡ ClickHouse
 ```
 
 | Plane | Tool | Audience | What it does |
 |---|---|---|---|
-| 🟢 **Product** | **Streamlit** ([demo](https://snorlax.streamlit.app/)) | business / content / ad-ops | Concurrency curves, KPI tiles, and dimension filters — the *insights* people act on. |
+| 🟢 **Product** | **Streamlit** ([demo](https://snorlax.streamlit.app/) · [source](sonyliv-dashboard-py/)) | business / content / ad-ops | Concurrency curves, KPI tiles, dimension filters, drill-down — the *insights* people act on. |
 | 🔵 **Engine** | **ClickStack (HyperDX)** | engineers / operators | Internal & dev-level metrics: ingestion lag, data-quality drift, query latency / `read_rows`. Proves the system is fast, healthy, and reading the serving layer — not raw history. Also ingests the Streamlit app's **OpenTelemetry** traces, so UI latency joins the same picture. |
-| 💬 **Conversational** | **LibreChat + [ClickHouse MCP](https://github.com/ClickHouse/mcp-clickhouse)** | anyone, no SQL | Ask *"what was peak concurrency on Android in the last hour?"* in plain English; it queries `concurrency_now` and answers. |
-| 🔭 **LLM observability** | **Langfuse** | LLM / integrations dev | Traces every question → generated SQL → answer through the chat layer, so prompt quality, latency, and cost are measured, not guessed. |
+| 💬 **Conversational** | **LibreChat** + **[ClickHouse MCP](https://github.com/ClickHouse/mcp-clickhouse)** + ClickStack MCP, on a local **Ollama** model | anyone, no SQL | The in-app **Insights Copilot** routes through LibreChat, which runs the turn on a local Ollama model and hands it MCP tools to query the data and the telemetry directly. Local model, no paid key — every request still flows through LibreChat. Falls back to direct-Ollama if LibreChat is down. |
+| 🔭 **LLM observability** | **Langfuse** | LLM / integrations dev | Traces the Copilot's turns — prompt, latency, cost — so the AI layer is measured, not guessed. |
 
-**The split that matters:** ClickStack watches the *machine* (is the pipeline healthy, are queries cheap, is the data correct); Streamlit surfaces the *product* (what's the audience doing right now); LibreChat opens both to anyone who can type a question; Langfuse keeps that AI layer honest. Same ClickHouse underneath — four lenses on top.
+**The split that matters:** ClickStack watches the *machine* (is the pipeline healthy, are queries cheap, is the data correct); Streamlit surfaces the *product* (what's the audience doing right now); LibreChat + MCP open both to anyone who can type a question; Langfuse keeps that AI layer honest. Same ClickHouse underneath — four lenses on top.
 
 <!-- 📸 LibreChat conversational-plane screenshots go here -->
 <!-- 📸 Langfuse trace screenshots go here -->
@@ -145,11 +145,12 @@ The challenge asks for *meaningful* integration of **at least one** of ClickStac
 .
 ├── problem/     📋 the challenge brief, dataset dictionary, and starting notes
 ├── plan/        🗺️  the design doc — decisions, trade-offs, and why we rejected alternatives
-├── producer/    📼 event-stream simulator → Redpanda/ClickHouse (pauses, ads, drops, marathons, late arrivals)
-├── migrations/  🛠️  idempotent schema migrations + the run_sql.py runner (build / reset / verify)
-├── docs/        📖 traced-from-code architecture & schema reference
-├── benchmark/   ✅ the query set we're judged on, verified against an independent raw-events oracle
-└── assets/      📸 dashboard & UI screenshots used across the docs
+├── producer/            📼 event-stream simulator → Redpanda/ClickHouse (pauses, ads, drops, marathons, late arrivals)
+├── migrations/          🛠️  idempotent schema migrations + the run_sql.py runner (build / reset / verify)
+├── sonyliv-dashboard-py/ 🖥️  Streamlit product dashboard + Insights Copilot (LibreChat/MCP) + OTel instrumentation
+├── docs/                📖 traced-from-code architecture & schema reference
+├── benchmark/           ✅ the query set we're judged on, verified against an independent raw-events oracle
+└── assets/              📸 dashboard & UI screenshots used across the docs
 ```
 
 ## 🏃 Runbook — running it locally
@@ -265,10 +266,10 @@ Built against the plan in [`plan/PLAN.md`](plan/PLAN.md) — see §10 there for 
 - [x] Hot/cold tiered serving with a race-free compaction boundary
 - [x] Independent verification oracle (`benchmark/`, `migrations/*verify*`)
 - [x] ClickStack (HyperDX) observability wired into the live pipeline
-- [x] LibreChat + ClickHouse MCP conversational layer
-- [x] Langfuse tracing over the chat layer
-- [x] Streamlit dashboard ([live demo](https://snorlax.streamlit.app/))
-- [ ] Streamlit → OpenTelemetry traces into ClickStack *(in progress)*
+- [x] Streamlit dashboard ([live demo](https://snorlax.streamlit.app/) · [source](sonyliv-dashboard-py/))
+- [x] Streamlit → OpenTelemetry traces into ClickStack
+- [x] Insights Copilot: LibreChat + ClickHouse/ClickStack MCP on a local Ollama model
+- [x] Langfuse tracing over the Copilot
 - [ ] Unseen-day sealed run
 
 ## 🤝 Contributing
