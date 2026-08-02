@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 600" width="480" height="600" role="img" aria-label="SonyLIV Daily Wrapped — cover card">
+  <defs>
+    <linearGradient id="wrp" x1="0%" y1="0%" x2="90%" y2="100%">
+      <stop offset="0%" stop-color="#ff2d95"/>
+      <stop offset="100%" stop-color="#7a04eb"/>
+    </linearGradient>
+  </defs>
+
+  <!-- card -->
+  <rect x="8" y="8" width="464" height="584" rx="28" fill="url(#wrp)"/>
+
+  <!-- eyebrow -->
+  <text x="44" y="74" fill="#ffffff" fill-opacity="0.85"
+        font-family="Verdana, Geneva, sans-serif" font-size="14" font-weight="600"
+        letter-spacing="3">SONYLIV · DAILY WRAPPED</text>
+
+  <!-- headline -->
+  <g fill="#ffffff" font-family="'Arial Black', Helvetica, sans-serif" font-weight="800" font-size="72" letter-spacing="-1">
+    <text x="42" y="230">How the</text>
+    <text x="42" y="300">country</text>
+    <text x="42" y="370">watched.</text>
+  </g>
+
+  <!-- date -->
+  <text x="44" y="470" fill="#ffffff" fill-opacity="0.92"
+        font-family="Verdana, Geneva, sans-serif" font-size="18" font-weight="700"
+        letter-spacing="0.5">Friday · July 31, 2026</text>
+
+  <!-- subtitle -->
+  <text x="44" y="520" fill="#ffffff" fill-opacity="0.82"
+        font-family="Verdana, Geneva, sans-serif" font-size="15">
+    <tspan x="44" dy="0">Your day on SonyLIV, one story at a</tspan>
+    <tspan x="44" dy="22">time. Hit Next →</tspan>
+  </text>
+</svg>

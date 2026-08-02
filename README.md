@@ -1,4 +1,4 @@
-# 🦥 Snorlax
+<h1><img src="docs/images/snorlax-icon.svg" alt="Snorlax" height="36" align="center"> Snorlax</h1>
 
 **Foreground-only concurrency, at streaming scale — on ClickHouse.**
 
@@ -8,6 +8,10 @@ Snorlax answers *"how many sessions are truly watching, right now?"* — not how
 [![ClickHouse](https://img.shields.io/badge/ClickHouse-Cloud-FFCC01?logo=clickhouse&logoColor=black)](https://clickhouse.com/)
 [![Python](https://img.shields.io/badge/Python-3.9%2B-3776AB?logo=python&logoColor=white)](producer/requirements.txt)
 [![Status](https://img.shields.io/badge/status-hackathon--build-orange)](plan/PLAN.md)
+
+<p align="center">
+  <img src="docs/images/daily-wrapped.svg" alt="SonyLIV Daily Wrapped — a Spotify-Wrapped-style story of a single day's viewing" width="480">
+</p>
 
 ---
 
@@ -23,6 +27,12 @@ Because most sessions are, mechanically, asleep — paused, backgrounded, silent
 - ♻️ **Update-friendly** — open sessions and late heartbeats are absorbed incrementally (30s hot refresh, 1min cold compaction) — never a full rebuild.
 - ✅ **Self-verifying** — every served number is checked against an independent, raw-events oracle. Zero mismatches is the bar.
 - 📊 **Filterable at query time** — platform, country, content, video type, and (on the extended path) app/player version + audio/subtitle language.
+
+## 📱 Dashboard & Daily Wrapped
+
+A Streamlit dashboard ([`sonyliv-dashboard-py/`](sonyliv-dashboard-py/)) reads the serving layer directly — `filter → sum → max/avg`, nothing else. Alongside the analyst views, **Daily Wrapped** (shown above) turns a single day of viewing into a Spotify-Wrapped-style story: vivid gradient cards you step through one insight at a time, auto-anchored to the busiest day in the data, ending in a shareable recap poster.
+
+> _The hero image is a vector mock of the cover card. To use a real screenshot, save it as `docs/images/daily-wrapped.png` and update the `src` reference. Add more cards (e.g. `daily-wrapped-primetime.png`, `dashboard-overview.png`) to the same folder and reference them here._
 
 ## 🏗️ Architecture
 
@@ -59,8 +69,9 @@ A session isn't "active" just because it's open. `VideoSessionStart` seeds a ses
 ├── plan/        🗺️  the design doc — decisions, trade-offs, and why we rejected alternatives
 ├── producer/    📼 event-stream simulator → Redpanda/ClickHouse (pauses, ads, drops, marathons, late arrivals)
 ├── migrations/  🛠️  idempotent schema migrations + the run_sql.py runner (build / reset / verify)
-├── docs/        📖 traced-from-code architecture & schema reference
-└── benchmark/   ✅ the query set we're judged on, verified against an independent raw-events oracle
+├── docs/        📖 traced-from-code architecture & schema reference (+ images/ for screenshots)
+├── benchmark/   ✅ the query set we're judged on, verified against an independent raw-events oracle
+└── sonyliv-dashboard-py/  📱 Streamlit dashboard + Daily Wrapped story mode
 ```
 
 ## 🚀 Quick start
