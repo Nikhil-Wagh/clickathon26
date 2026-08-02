@@ -152,18 +152,15 @@ The challenge asks for *meaningful* integration of **at least one** of ClickStac
 ## 📂 Repository layout
 
 ```
-Snorlax/
-├── problem/              📋 the challenge brief, dataset dictionary, and starting notes
-├── plan/                 🗺️  the design doc — decisions, trade-offs, and why we rejected alternatives
-├── producer/             📼 event-stream simulator → Redpanda/ClickHouse (pauses, ads, drops, marathons, late arrivals)
-├── schema/               🧱 ClickHouse DDL, MVs, backfill, approaches, comparison, verify
-│   └── migrations/       🛠️  idempotent schema migrations + the run_sql.py runner (build / reset / verify)
+.
+├── problem/     📋 the challenge brief, dataset dictionary, and starting notes
+├── plan/        🗺️  the design doc — decisions, trade-offs, and why we rejected alternatives
+├── producer/            📼 event-stream simulator → Redpanda/ClickHouse (pauses, ads, drops, marathons, late arrivals)
+├── migrations/          🛠️  idempotent schema migrations + the run_sql.py runner (build / reset / verify)
 ├── sonyliv-dashboard-py/ 🖥️  Streamlit product dashboard + Insights Copilot (LibreChat/MCP) + OTel instrumentation
-├── docs/                 📖 traced-from-code architecture & schema reference
-├── benchmark/            ✅ the query set we're judged on, verified against an independent raw-events oracle
-├── presentation/         🎤 the demo/presentation deck
-├── unseen_data/          🗃️  sealed "unseen day" dataset for the final replay
-└── assets/               📸 dashboard & UI screenshots used across the docs
+├── docs/                📖 traced-from-code architecture & schema reference
+├── benchmark/           ✅ the query set we're judged on, verified against an independent raw-events oracle
+└── assets/              📸 dashboard & UI screenshots used across the docs
 ```
 
 ## 🏃 Runbook — running it locally
@@ -204,25 +201,25 @@ source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-Reuse this same virtualenv for `schema/migrations/` and `benchmark/` — all three share `clickhouse-connect` + `python-dotenv`.
+Reuse this same virtualenv for `migrations/` and `benchmark/` — all three share `clickhouse-connect` + `python-dotenv`.
 
 ### 3 — Build the schema
 
 ```bash
-cd ../schema/migrations
+cd ../migrations
 python run_sql.py --reset --build     # 💥 drops everything, recreates structure fresh
 # or, on an existing deployment:
 python run_sql.py --migrate           # ✅ applies pending numbered migrations only
 ```
 
-`--reset` is destructive (see [`schema/migrations/README.md`](schema/migrations/README.md)) — use `--migrate` once a service is already live. `run_sql.py -i` drops you into an interactive REPL if you want to poke around (`\q` to quit).
+`--reset` is destructive (see [`migrations/README.md`](migrations/README.md)) — use `--migrate` once a service is already live. `run_sql.py -i` drops you into an interactive REPL if you want to poke around (`\q` to quit).
 
 ### 4 — Seed or stream data
 
 Either replay the sample dataset once for a quick smoke test, or run the live producer continuously:
 
 ```bash
-cd ../../producer
+cd ../producer
 python produce_events.py
 ```
 
@@ -248,7 +245,7 @@ python benchmark.py
 ### 🧹 Resetting
 
 ```bash
-cd schema/migrations
+cd migrations
 python run_sql.py --reset --build
 ```
 
@@ -277,7 +274,7 @@ Built against the plan in [`plan/PLAN.md`](plan/PLAN.md) — see §10 there for 
 
 - [x] Active-interval state machine, deterministic under same-millisecond ties
 - [x] Hot/cold tiered serving with a race-free compaction boundary
-- [x] Independent verification oracle (`benchmark/`, `schema/06_verify.sql`)
+- [x] Independent verification oracle (`benchmark/`, `migrations/*verify*`)
 - [x] ClickStack (HyperDX) observability wired into the live pipeline
 - [x] Streamlit dashboard ([live demo](https://snorlax.streamlit.app/) · [source](sonyliv-dashboard-py/))
 - [x] Streamlit → OpenTelemetry traces into ClickStack
@@ -285,16 +282,9 @@ Built against the plan in [`plan/PLAN.md`](plan/PLAN.md) — see §10 there for 
 - [x] Langfuse tracing over the Copilot
 - [ ] Unseen-day sealed run
 
-## 👥 Team
-
-- Nikhil Wagh (Nikhil-Wagh)
-- Monika Nayak (themonikanayak)
-- Abhishek Surve (abhisheksurve45)
-- Tarun Anand (taakasj)
-
 ## 🤝 Contributing
 
-This is a hackathon build — see [`plan/PLAN.md`](plan/PLAN.md) §12 for the current team split and open workstreams. Schema changes go through [`schema/migrations/`](schema/migrations/README.md) as numbered, idempotent files — no stray `.sql` scattered around.
+This is a hackathon build — see [`plan/PLAN.md`](plan/PLAN.md) §12 for the current team split and open workstreams. Schema changes go through [`migrations/`](migrations/README.md) as numbered, idempotent files — no stray `.sql` scattered around.
 
 ## 📄 License
 
