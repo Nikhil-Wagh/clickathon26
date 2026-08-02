@@ -121,6 +121,25 @@ def fmt(n) -> str:
     return f"{int(n):,}" if pd.notna(n) else "—"
 
 
+def human(n) -> str:
+    """Compact, business-friendly number: 950, 12.3K, 1.2M, 3.4B.
+
+    For headline tiles read by non-technical folks — easier to scan than a long
+    comma-separated integer. Values under 1,000 stay exact.
+    """
+    if not pd.notna(n):
+        return "—"
+    n = float(n)
+    a = abs(n)
+    if a >= 1_000_000_000:
+        return f"{n / 1_000_000_000:.1f}B"
+    if a >= 1_000_000:
+        return f"{n / 1_000_000:.1f}M"
+    if a >= 1_000:
+        return f"{n / 1_000:.1f}K"
+    return f"{int(round(n)):,}"
+
+
 def pretty_minute(ts) -> str:
     if not ts or pd.isna(ts):
         return "—"
