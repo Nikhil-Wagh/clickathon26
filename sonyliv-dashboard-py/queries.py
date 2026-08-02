@@ -153,6 +153,25 @@ GROUP BY dimension, name
 ORDER BY dimension, peak DESC
 LIMIT 50 BY dimension"""
 
+# Audience by hour of DAY (0–23), aggregated across every day in the range —
+# answers the business question "when is prime time?". Per the correctness rule,
+# sum concurrency per minute FIRST, then avg/max those per-minute totals within
+# each hour-of-day bucket.
+_Q_AUDIENCE_BY_HOUR = f"""
+WITH {_RANGE_CTE},
+per_min AS (
+  SELECT minute, sum(concurrent) AS c
+  FROM {DB}.concurrency_now
+  WHERE {_WHERE}
+  GROUP BY minute
+)
+SELECT toUInt8(toHour(minute)) AS hour,
+       toUInt32(round(avg(c))) AS avg_viewers,
+       toUInt32(max(c))        AS peak_viewers
+FROM per_min
+GROUP BY hour
+ORDER BY hour"""
+
 # Top content by peak concurrency. `content_dict` (a dictionary over
 # `content_dim`, see schema.sql) avoids a JOIN on this hot path.
 _Q_TOP_CONTENT = f"""
@@ -394,6 +413,14 @@ def get_breakdowns(filters: dict) -> pd.DataFrame:
 def get_top_content(filters: dict, limit: int = 15) -> pd.DataFrame:
     """Top content by peak concurrency (with titles), honoring filters."""
     return query_df(_Q_TOP_CONTENT, {**filters, "limit": limit})
+
+
+def get_audience_by_hour(filters: dict) -> pd.DataFrame:
+    """Average & peak viewers per hour of day (0–23) — the 'prime time' view.
+
+    Columns: hour (int 0–23), avg_viewers, peak_viewers.
+    """
+    return query_df(_Q_AUDIENCE_BY_HOUR, filters)
 
 
 def get_data_quality_report(filters: dict) -> dict:
