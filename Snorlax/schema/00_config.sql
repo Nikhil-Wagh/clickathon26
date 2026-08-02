@@ -17,6 +17,7 @@
 
 -- Drop dependents BEFORE leaves (a function referenced by another can't be
 -- dropped first), then recreate leaves BEFORE the derived one.
+DROP FUNCTION IF EXISTS cfg_seal_lag_seconds;
 DROP FUNCTION IF EXISTS cfg_gap_timeout_seconds;
 DROP FUNCTION IF EXISTS cfg_bucket_seconds;
 DROP FUNCTION IF EXISTS cfg_heartbeat_seconds;
@@ -82,6 +83,37 @@ CREATE FUNCTION cfg_gap_timeout_seconds AS () -> cfg_heartbeat_seconds() + cfg_m
 -- ---------------------------------------------------------------------
 CREATE FUNCTION cfg_hot_window_seconds AS () -> 600;
 
+-- ---------------------------------------------------------------------
+-- KNOB 5 — SEAL LAG  (the incremental-derivation cursor knob, PLAN §9a)
+-- How many seconds behind now() a session's active islands are FROZEN
+-- ("sealed") and never re-read again. The incremental mv_session_intervals
+-- carries every island whose active_end <= now() - this value forward
+-- verbatim from the previous refresh, and re-reads only the events AFTER
+-- that boundary (the "provisional tail") — so per-cycle derivation cost is
+-- O(tail events), independent of how long the session has been running.
+-- This is what turns the old full-history re-derivation (cost ∝ session
+-- DURATION, PLAN §9) into a linear cost (cost ∝ event ARRIVAL RATE).
+--
+-- CORRECTNESS BOUND — set this GENEROUSLY above two things:
+--   1. cfg_gap_timeout_seconds() — an island's end is only final once no
+--      in-order heartbeat can still extend/bridge it (needs > one gap timeout).
+--   2. p99 ingest lag (measure via ClickStack) — an event can land this late;
+--      sealing sooner would freeze an island before its own late events arrive.
+--   So: cfg_seal_lag_seconds() >= cfg_gap_timeout_seconds() + p99_ingest_lag.
+-- UPPER BOUND — must stay well BELOW the derivation recency window
+--   (01_schema.sql D2, INTERVAL 20 MINUTE = 1200s): a session must get at
+--   least one refresh where its whole active span has aged past the seal
+--   boundary while it is still inside the recency window, or its trailing
+--   island never seals. Keep a comfortable margin.
+--   300 = 5 min (default): 90s gap timeout + ample ingest-lag headroom, and
+--         4× below the 20-min recency window. Late data BEYOND this horizon
+--         is caught by the low-cadence full-resync MV (01_schema.sql D2b),
+--         not lost.
+-- Plain constant (like cfg_hot_window_seconds): sits inside toIntervalSecond(),
+-- which constant-folds a UDF body, so it is safe here.
+-- ---------------------------------------------------------------------
+CREATE FUNCTION cfg_seal_lag_seconds AS () -> 300;
+
 -- =====================================================================
 -- DIMENSION NORMALIZATION  (applied at INGEST — the edge, per PLAN §9)
 -- The raw data has case/format-split dimension values that would fragment
@@ -114,6 +146,7 @@ SELECT cfg_bucket_seconds()                    AS bucket_seconds,
        cfg_missing_heartbeat_buffer_seconds()  AS missing_heartbeat_buffer_seconds,
        cfg_gap_timeout_seconds()               AS gap_timeout_seconds,
        cfg_hot_window_seconds()                AS hot_window_seconds,
+       cfg_seal_lag_seconds()                  AS seal_lag_seconds,
        norm_lang('HIN')                        AS ex_hin,          -- -> hin
        norm_lang('hin-hindi')                  AS ex_hin_hindi,    -- -> hin
        norm_lang('')                           AS ex_empty_lang,   -- -> unk
@@ -124,7 +157,11 @@ SELECT cfg_bucket_seconds()                    AS bucket_seconds,
 --   These sit in `REFRESH EVERY` / `INTERVAL` literals that ClickHouse will
 --   not accept a function for, so change them at the source file:
 --   * Derivation lookback (recently-active sessions) ... 01_schema.sql D2
---       `INTERVAL 20 MINUTE`  — must exceed cfg_hot_window_seconds().
+--       `INTERVAL 20 MINUTE`  — must exceed BOTH cfg_hot_window_seconds()
+--       and cfg_seal_lag_seconds() (a session must seal before it ages out).
+--   * Full-resync cadence / window (late-data self-heal) . 01_schema.sql D2b
+--       `REFRESH EVERY 5 MINUTE` over `INTERVAL 30 MINUTE` — lower cadence =
+--       cheaper but slower to correct late data past the seal horizon.
 --   * Refresh cadence ........................... 01_schema.sql D2/D3
 --       `REFRESH EVERY 1 MINUTE` / `EVERY 30 SECOND`.
 --   * events_raw retention ...................... 01_schema.sql
